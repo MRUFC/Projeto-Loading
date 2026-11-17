@@ -43,6 +43,11 @@ void setup() {
 
 void loop() {
   
+  //inicio do calulo para desligar o sistema
+  unsigned long agora = millis;
+  Serial.print("Inicio do ciclo atual em ms: ");
+  Serial.println(agora);
+
   //solicita a medicao por meio da funcao pertencente ao sensor
   sensor.requestTemperatures();
   //pega a temperatura em graus C no sensor de indice X(0 no caso)
@@ -75,7 +80,10 @@ void loop() {
   }
 
   //rele funcionando
-  digitalWrite(26, CMDAquecimento ? HIGH : LOW);
+  bool releTravado = (digitalRead(25)==LOW);
+  bool aquecendo = CMDAquecimento || releTravado;
+
+  digitalWrite(26,aquecendo ? HIGH:LOW);
   
   Serial.print("Temperatura: ");
   Serial.println(textoTemperatura);
@@ -97,8 +105,13 @@ void loop() {
     lcd.print("NORMAL      ");
   }
 
-  Serial.print("Chave do rele");
-  Serial.println(digitalRead(25));
+  //conferindo o motivo de o sistema desligar o aquecimento
+  Serial.print("Comando: ");
+  Serial.print(CMDAquecimento);
+  Serial.print(" Rele travado: ");
+  Serial.print(releTravado);
+  Serial.print(" Aquecimento: ");
+  Serial.println(aquecendo);
 
-  delay(1000);
+  delay(800);
 }
