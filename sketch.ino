@@ -12,6 +12,10 @@ LiquidCrystal_I2C  lcd(0x27,20,4);
 
 bool CMDAquecimento = false;
 
+bool falha = false;
+unsigned long inicioFalha = 0;
+
+bool bloqueado = false;
 
 void setup() {
 
@@ -44,14 +48,40 @@ void setup() {
 void loop() {
   
   //inicio do calulo para desligar o sistema
-  unsigned long agora = millis;
+  unsigned long agora = millis();
   Serial.print("Inicio do ciclo atual em ms: ");
   Serial.println(agora);
+
+  // Refaz a descoberta se nenhum sensor foi identificado, corrige bug
+  if (sensor.getDeviceCount() == 0) {
+    sensor.begin();
+  }
 
   //solicita a medicao por meio da funcao pertencente ao sensor
   sensor.requestTemperatures();
   //pega a temperatura em graus C no sensor de indice X(0 no caso)
   float temperatura = sensor.getTempCByIndex(0);
+
+  unsigned long instanteLeitura = millis();
+  
+  if(temperatura == DEVICE_DISCONNECTED_C){
+
+    if(!falha){
+
+      inicioFalha=instanteLeitura;
+      falha = true;
+    }
+    Serial.print("tempo em falha(ms): ");
+    Serial.println(instanteLeitura - inicioFalha);
+
+    if(instanteLeitura - inicioFalha >= 10000UL){
+      
+      bloqueado = true;
+    }
+  }else{
+    falha = false;
+
+  }
 
   // Prepara um campo de seis caracteres para o LCD
   char textoTemperatura[16];
@@ -68,7 +98,7 @@ void loop() {
   lcd.print(textoTemperatura);
 
   //Decide o comando de aquecimento; falha de leitura tem prioridade sobre a histerese
-  if (temperatura == DEVICE_DISCONNECTED_C) {
+  if (bloqueado || temperatura == DEVICE_DISCONNECTED_C) {
     
     CMDAquecimento = false;
   } else if (temperatura <= 48) {
@@ -78,7 +108,13 @@ void loop() {
     
     CMDAquecimento = false;
   }
-
+  lcd.setCursor(0,3);
+  if(bloqueado){
+    lcd.print("Bloqueado: REARME");
+  } else{
+    lcd.print("                    ");
+  }
+  
   //rele funcionando
   bool releTravado = (digitalRead(25)==LOW);
   bool aquecendo = CMDAquecimento || releTravado;
@@ -105,6 +141,7 @@ void loop() {
     lcd.print("NORMAL      ");
   }
 
+
   //conferindo o motivo de o sistema desligar o aquecimento
   Serial.print("Comando: ");
   Serial.print(CMDAquecimento);
@@ -112,6 +149,7 @@ void loop() {
   Serial.print(releTravado);
   Serial.print(" Aquecimento: ");
   Serial.println(aquecendo);
-
+  Serial.print("Bloqueado: ");
+  Serial.println(bloqueado);
   delay(800);
 }
