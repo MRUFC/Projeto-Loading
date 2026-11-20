@@ -17,6 +17,8 @@ unsigned long inicioFalha = 0;
 
 bool bloqueado = false;
 
+const int buzzer = 33;
+
 void setup() {
 
   Serial.begin(115200);
@@ -43,6 +45,9 @@ void setup() {
   lcd.print("Estado:");
 
   pinMode(25, INPUT_PULLUP);
+  pinMode(32, INPUT_PULLUP);
+
+  pinMode(buzzer,OUTPUT);
 }
 
 void loop() {
@@ -97,6 +102,13 @@ void loop() {
   lcd.setCursor(12,1);
   lcd.print(textoTemperatura);
 
+  bool rearme = (digitalRead(32)==LOW);
+
+  if(bloqueado && !falha && rearme){
+
+    bloqueado = false;
+  }
+
   //Decide o comando de aquecimento; falha de leitura tem prioridade sobre a histerese
   if (bloqueado || temperatura == DEVICE_DISCONNECTED_C) {
     
@@ -115,9 +127,11 @@ void loop() {
     lcd.print("                    ");
   }
   
-  //rele funcionando
+  
   bool releTravado = (digitalRead(25)==LOW);
-  bool aquecendo = CMDAquecimento || releTravado;
+
+  // O bloqueio representa um corte de segurança independente
+  bool aquecendo = !bloqueado && (CMDAquecimento || releTravado);
 
   digitalWrite(26,aquecendo ? HIGH:LOW);
   
@@ -142,7 +156,21 @@ void loop() {
   }
 
 
-  //conferindo o motivo de o sistema desligar o aquecimento
+  // Alarme sonoro: falha do sensor tem prioridade
+  if (falha) {
+   tone(buzzer, 2000);
+
+  } else if (temperatura > 60) {
+    tone(buzzer, 1000);
+
+  } else if (temperatura < 30) {
+    tone(buzzer, 500);
+
+  } else {
+    noTone(buzzer);
+  }
+
+  //conferindo o motivo de o sistema desligar o aquecimento / verificando estado das pecas
   Serial.print("Comando: ");
   Serial.print(CMDAquecimento);
   Serial.print(" Rele travado: ");
@@ -151,5 +179,7 @@ void loop() {
   Serial.println(aquecendo);
   Serial.print("Bloqueado: ");
   Serial.println(bloqueado);
+  Serial.print("Estado do botao: ");
+  Serial.println(digitalRead(32)); 
   delay(800);
 }
